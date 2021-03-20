@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -30,9 +31,6 @@ const (
 	KeySignature    = "sig"
 )
 
-type (
-	Location string
-)
 
 type RequestCheckin struct {
 	UserID   uint32    `json:"user_id"`
@@ -40,13 +38,13 @@ type RequestCheckin struct {
 
 type Beacon struct {
 	PublicKey  ed25519.PublicKey  `json:"pk"`
-	SigningKey ed25519.PrivateKey `json:"sk"`
-	Location   Location           `json:"location"`
+	signingKey ed25519.PrivateKey
+	Location   string           `json:"location"`
 }
 
 func (b *Beacon) Values() url.Values {
 	return url.Values{
-		KeyLocation: {string(b.Location)},
+		KeyLocation: {b.Location},
 		KeyBeaconPublic: {hex.EncodeToString(b.PublicKey)},
 	}
 }
@@ -60,32 +58,31 @@ func (b *Beacon) NewMessage(userID uint32) *Message {
 func (b *Beacon) NewSignedMessage(msg *Message) *SignedMessage {
 	return &SignedMessage{
 		Message:   *msg,
-		Signature: ed25519.Sign(b.SigningKey, msg.Bytes()),
+		Signature: ed25519.Sign(b.signingKey, msg.Bytes()),
 	}
 }
 
-func (b *Beacon) Advertise() {
+func (b *Beacon) Advertise() error  {
 	data, err := json.Marshal(b)
 	if err != nil {
-		log.Panicln(err)
-		return
+		return err
 	}
 	_, err = http.Post(URLAdvertise, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		log.Panicln(err)
-		return
+		return err
 	}
+	return nil
 }
 
-func (b *Beacon) Save() {
+func (b *Beacon) Save() error {
 	data, err := json.Marshal(b)
 	if err != nil {
-		log.Println(err)
+		return err
 	}
-	err = os.WriteFile(string(b.Location+".json"), data, 0664)
-	if err != nil {
-		log.Println(err)
+	if err = os.WriteFile(string(b.Location+".json"), data, 0664); err != nil {
+		return err
 	}
+	return nil
 }
 
 func checkinHandler(beacon *Beacon) http.HandlerFunc {
@@ -107,32 +104,44 @@ func checkinHandler(beacon *Beacon) http.HandlerFunc {
 			return
 		}
 		qrterminal.Generate(string(msgStr), qrterminal.L, w)
-		//qrterminal.Generate(msg.Values().Encode(), qrterminal.L, os.Stdout)
 	}
+}
+
+func (b *Beacon) Load() error {
+	buf := make([]byte, 1024)
+	f, err := os.Open(b.Location + ".json")
+	if err == nil {
+		n, err := f.Read(buf)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(buf[:n], &b); err != nil {
+			return err
+		}
+	} else if errors.Is(err, fs.ErrNotExist){
+		b.PublicKey, b.signingKey, err = ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return err
+		}
+		b.Save()
+	} else {
+		return err
+	}
+	return nil
 }
 
 func main() {
 	var beacon Beacon
-
-	location := *flag.String("location", "Central Park", "the name of the ")
-	buf := make([]byte, 1024)
-	f, err := os.Open(location + ".json")
-	if err == nil {
-		n, err := f.Read(buf)
-		if err != nil {
-			log.Println(err)
-		}
-		err = json.Unmarshal(buf[:n], &beacon)
-		if err != nil {
-			log.Println(err)
-		}
-	} else if errors.Is(err, fs.ErrNotExist){
-		beacon.PublicKey, beacon.SigningKey, _ = ed25519.GenerateKey(rand.Reader)
-		beacon.Location = Location(location)
-		beacon.Save()
-	} else {
+	flag.StringVar(&beacon.Location, "location", "Central Park", "the name of the ")
+	flag.Parse()
+	if err := beacon.Load(); err != nil {
 		log.Panicln(err)
 	}
+	if err := beacon.Advertise(); err != nil {
+		log.Panicln(err)
+	}
+	fmt.Println(beacon.Location)
+
 	http.HandleFunc("/checkin", checkinHandler(&beacon))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

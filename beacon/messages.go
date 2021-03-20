@@ -12,7 +12,7 @@ import (
 type Message struct {
 	UserID   uint32    `json:"user_id"`
 	Time     time.Time `json:"time"`
-	Location Location  `json:"location"`
+	Location string  `json:"location"`
 }
 
 type SignedMessage struct {
