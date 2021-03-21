@@ -1,0 +1,39 @@
+{
+  "name": "beacon",
+  "version": "0.0.1",
+  "description": "An app that incentivises you to go out for a walk",
+  "productName": "Beacon Active",
+  "author": "Marcus Hamelink",
+  "private": true,
+  "scripts": {
+    "test": "echo \"No test specified\" && exit 0"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.0.0",
+    "axios": "^0.21.1",
+    "core-js": "^3.6.5",
+    "qrcode.vue": "^1.7.0",
+    "quasar": "^1.0.0",
+    "vue-qrcode-reader": "^2.3.18",
+    "vue-qriously": "^1.1.1"
+  },
+  "devDependencies": {
+    "@quasar/app": "^2.2.2"
+  },
+  "browserslist": [
+    "last 10 Chrome versions",
+    "last 10 Firefox versions",
+    "last 4 Edge versions",
+    "last 7 Safari versions",
+    "last 8 Android versions",
+    "last 8 ChromeAndroid versions",
+    "last 8 FirefoxAndroid versions",
+    "last 10 iOS versions",
+    "last 5 Opera versions"
+  ],
+  "engines": {
+    "node": ">= 10.18.1",
+    "npm": ">= 6.13.4",
+    "yarn": ">= 1.21.1"
+  }
+}
